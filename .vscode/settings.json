@@ -6,5 +6,9 @@
         "board/esp32s3-builtin.cfg"
     ],
     "idf.portWin": "COM3",
-    "idf.toolsPathWin": "C:\\Users\\Martin\\.espressif"
+    "idf.toolsPathWin": "C:\\Users\\Martin\\.espressif",
+    "idf.currentSetup": "C:/Espressif/frameworks/esp-idf-v5.5.2/",
+    "idf.customExtraVars": {
+        "IDF_TARGET": "esp32s3"
+    }
 }
