@@ -133,3 +133,4 @@ Vollständige Parameter-Liste, IDs, Typen, Limits und UART/JSON-Protokoll → `d
 - `docs/control_loop.md` – Reglerparametrierung, Abtastzeiten
 - `docs/hardware.md` – Schaltplan-Referenz, Pinbelegung ESP32-S3
 - `docs/parameters.md` – Parameter-IDs, Typen, Limits, UART/JSON-Protokoll
+- `docs/webserver.md` – Captive Portal, Seiten, REST-API
