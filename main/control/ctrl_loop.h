@@ -27,6 +27,13 @@ extern "C" {
 esp_err_t ctrl_loop_init(void);
 
 /**
+ * @brief 100-µs-Timer starten (ctrl_timer_sem periodisch geben).
+ *        Muss NACH ctrl_loop_init() und NACH erfolgreicher Hardware-Verifikation
+ *        aufgerufen werden (app_main Phase 6).
+ */
+esp_err_t ctrl_loop_start_timer(void);
+
+/**
  * @brief Regler aktivieren und Integratoren zurücksetzen.
  *        Wird von sm_task beim Eintritt in SYS_ACTIVE aufgerufen.
  */

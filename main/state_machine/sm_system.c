@@ -201,12 +201,22 @@ static void process_event(const sm_event_t *evt)
  * ========================================================================= */
 void sm_task_func(void *arg)
 {
-    (void)arg;
+    /* module_err wird von app_main als (void *)(intptr_t)esp_err_t übergeben */
+    esp_err_t module_err = (esp_err_t)(intptr_t)arg;
     sm_event_t evt;
 
-    /* H-Brücke prüfen und INIT abschließen */
+    /* Init-Ergebnis ermitteln: Modul-Fehler ODER H-Brücken-Fault → FAIL */
     bool fault = mot_check_fault();
-    sm_event_t init_evt = { .id = fault ? EVT_INIT_FAIL : EVT_INIT_OK, .data = 0 };
+    sm_event_id_t init_result = EVT_INIT_OK;
+    if (module_err != ESP_OK) {
+        ESP_LOGE(TAG, "Modul-Init fehlgeschlagen: %s", esp_err_to_name(module_err));
+        init_result = EVT_INIT_FAIL;
+    }
+    if (fault) {
+        ESP_LOGE(TAG, "H-Brücken-Fault bei Init (NFAULT aktiv)");
+        init_result = EVT_INIT_FAIL;
+    }
+    sm_event_t init_evt = { .id = init_result, .data = (int32_t)module_err };
     xQueueSend(s_event_queue, &init_evt, portMAX_DELAY);
 
     for (;;) {

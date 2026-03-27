@@ -199,9 +199,7 @@ void app_main(void)
     /* ── Phase 6: Regler-Timer starten ───────────────────────────────── */
     /* ctrl_task ist bereit (blockiert auf Semaphor). Ab jetzt läuft der
      * Regelkreis. Motor bleibt disabled bis sm_task SYS_ACTIVE betritt. */
-    ESP_LOGI(TAG, "Phase 6: Regler-Timer gestartet (%u µs)", HODOR_CTRL_PERIOD_US);
-    /* TODO: ctrl_loop_start_timer() – der Timer-Handle muss aus ctrl_loop_init()
-     * exportiert werden. Interim-Lösung: Timer wird in ctrl_loop_init() gestartet. */
+    ESP_ERROR_CHECK(ctrl_loop_start_timer());
 
     /* ── Phase 7: Core-0-Tasks ────────────────────────────────────────── */
     ESP_LOGI(TAG, "Phase 7: Core-0-Tasks");

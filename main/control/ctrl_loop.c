@@ -25,9 +25,10 @@ static const char *TAG = "ctrl_loop";
 /* =========================================================================
  * Statischer Zustand (keine Allokation zur Laufzeit)
  * ========================================================================= */
-static SemaphoreHandle_t s_timer_sem  = NULL;
-static volatile uint32_t s_enabled   = 0;
-static volatile float    s_target_mm = 0.0f;
+static SemaphoreHandle_t  s_timer_sem    = NULL;
+static esp_timer_handle_t s_ctrl_timer   = NULL;
+static volatile uint32_t  s_enabled      = 0;
+static volatile float     s_target_mm    = 0.0f;
 
 static pi_state_t s_pi_current;
 static pi_state_t s_pi_velocity;
@@ -92,22 +93,34 @@ esp_err_t ctrl_loop_init(void)
     s_enabled   = 0;
     s_target_mm = 0.0f;
 
-    /* esp_timer wird in app_main Phase 6 gestartet */
-    esp_timer_handle_t timer;
+    /* Timer erstellen, aber NICHT starten – Start via ctrl_loop_start_timer()
+     * in app_main Phase 6 nach erfolgreicher Hardware-Verifikation. */
     esp_timer_create_args_t args = {
         .callback        = ctrl_timer_cb,
         .arg             = NULL,
         .dispatch_method = ESP_TIMER_TASK,
         .name            = "ctrl_100us",
     };
-    esp_err_t ret = esp_timer_create(&args, &timer);
+    esp_err_t ret = esp_timer_create(&args, &s_ctrl_timer);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_timer_create: %s", esp_err_to_name(ret));
         return ret;
     }
-    /* Timer-Handle in app_main für späteren Start speichern – hier nur erstellen */
 
-    ESP_LOGI(TAG, "Regelkreis initialisiert");
+    ESP_LOGI(TAG, "Regelkreis initialisiert (Timer bereit, nicht gestartet)");
+    return ESP_OK;
+}
+
+esp_err_t ctrl_loop_start_timer(void)
+{
+    if (!s_ctrl_timer) return ESP_ERR_INVALID_STATE;
+
+    esp_err_t ret = esp_timer_start_periodic(s_ctrl_timer, HODOR_CTRL_PERIOD_US);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_timer_start_periodic: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "Regler-Timer gestartet (%u µs)", HODOR_CTRL_PERIOD_US);
     return ESP_OK;
 }
 

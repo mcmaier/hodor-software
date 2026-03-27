@@ -160,6 +160,29 @@ extern "C" {
 #define HODOR_NVS_NAMESPACE           "hodor"
 
 /* =========================================================================
+ * WiFi
+ * ========================================================================= */
+/** NVS-Schlüssel für WiFi-Credentials (Strings, nicht im param_table) */
+#define HODOR_NVS_WIFI_SSID           "wifi_ssid"
+#define HODOR_NVS_WIFI_PASS           "wifi_pass"
+/** AP-Mode SSID (Erstinbetriebnahme / Fallback) */
+#define HODOR_WIFI_AP_SSID            "HODOR"
+/** STA-Modus: max. Verbindungsversuche bevor AP-Fallback */
+#define HODOR_WIFI_RETRY_MAX          5u
+/** AP-Mode IP-Adresse */
+#define HODOR_WIFI_AP_IP              "192.168.4.1"
+
+/* =========================================================================
+ * MQTT
+ * ========================================================================= */
+/** NVS-Schlüssel für MQTT-Konfiguration (Strings, nicht im param_table) */
+#define HODOR_NVS_MQTT_URI            "mqtt_uri"
+/** Standard-Befehlstopic */
+#define HODOR_MQTT_TOPIC_CMD          "hodor/cmd"
+/** Standard-Statustopic */
+#define HODOR_MQTT_TOPIC_STATUS       "hodor/status"
+
+/* =========================================================================
  * Sonstiges
  * ========================================================================= */
 #define HODOR_UART_BAUD               115200u

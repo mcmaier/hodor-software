@@ -22,11 +22,28 @@ typedef enum {
     MOT_DIR_COAST    = 3,
 } mot_dir_t;
 
+/** MC33HB2002 SPI-Status (aufgelöste Fault-Bits). */
+typedef struct {
+    bool ot;     /**< Übertemperatur-Abschaltung (latching) */
+    bool tw;     /**< Temperaturwarnung (non-latching) */
+    bool oc;     /**< Overcurrent (latching) */
+    bool ol;     /**< Open Load */
+    bool scg1;   /**< Kurzschluss nach GND, OUT1 (latching) */
+    bool scg2;   /**< Kurzschluss nach GND, OUT2 (latching) */
+    bool scp1;   /**< Kurzschluss nach VPWR, OUT1 (latching) */
+    bool scp2;   /**< Kurzschluss nach VPWR, OUT2 (latching) */
+    bool ov;     /**< Überspannung (non-latching) */
+    bool uv;     /**< Unterspannung (non-latching) */
+    bool cp_u;   /**< Ladepumpen-Unterspannung */
+    bool frm;    /**< SPI Framing Error */
+} mot_spi_status_t;
+
 typedef struct {
     float     duty_pct;   /**< Aktueller Duty-Cycle [−100 … +100 %] */
     mot_dir_t direction;
     bool      enabled;
-    bool      fault;      /**< H-Brücken-Fault (NFAULT-Signal) */
+    bool      fault;      /**< H-Brücken-Fault (NFAULT-Signal oder SPI) */
+    mot_spi_status_t spi_status; /**< Detaillierter SPI-Fehlerstatus */
 } mot_state_t;
 
 /**
@@ -61,8 +78,17 @@ esp_err_t mot_coast(void);
  */
 void mot_get_state(mot_state_t *out);
 
-/** @brief NFAULT-Pin auslesen und Fault-Flag aktualisieren. */
+/**
+ * @brief NFAULT-Pin UND SPI-Statusregister auslesen.
+ *        Aktualisiert fault-Flag und spi_status in mot_state_t.
+ */
 bool mot_check_fault(void);
+
+/**
+ * @brief Alle latching Faults im MC33HB2002 per SPI löschen.
+ *        Nur aufrufen wenn Fehlerursache beseitigt ist.
+ */
+esp_err_t mot_clear_faults(void);
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,9 @@
  * Befehlstopic:   hodor/cmd   (JSON: {"cmd": "open"} / "close" / "stop" / "toggle")
  * Statustopic:    hodor/status (JSON: {"sys":3,"door":2,"pos":400.0,"i":1.2})
  *
+ * Broker-URI wird aus NVS geladen (Schlüssel: HODOR_NVS_MQTT_URI).
+ * MQTT startet nur wenn PARAM_MQTT_EN == true UND URI gespeichert ist.
+ *
  * Wichtig: Befehle werden in ALLEN Systemzuständen (inkl. SYS_ACTIVE) verarbeitet,
  * da sm_event_queue immer konsumiert wird.
  */
@@ -18,23 +21,46 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "mqtt_client.h"
+#include "nvs.h"
 #include "esp_log.h"
 #include <string.h>
 #include <stdio.h>
 
 static const char *TAG = "comm_mqtt";
 
-#define MQTT_TOPIC_CMD    "hodor/cmd"
-#define MQTT_TOPIC_STATUS "hodor/status"
+#define WIFI_CONNECTED_BIT (1 << 0)
+#define MQTT_URI_MAX_LEN   128
 
 static esp_mqtt_client_handle_t s_client = NULL;
 
-/* Status-Queue wird von sm_system.c erstellt und hier verwendet */
-#define WIFI_CONNECTED_BIT (1 << 0)
+/* =========================================================================
+ * NVS – Broker-URI laden / speichern
+ * ========================================================================= */
+static bool load_mqtt_uri(char *uri, size_t len)
+{
+    nvs_handle_t nvs;
+    if (nvs_open(HODOR_NVS_NAMESPACE, NVS_READONLY, &nvs) != ESP_OK) return false;
+    esp_err_t ret = nvs_get_str(nvs, HODOR_NVS_MQTT_URI, uri, &len);
+    nvs_close(nvs);
+    return (ret == ESP_OK && uri[0] != '\0');
+}
 
+esp_err_t comm_mqtt_save_uri(const char *uri)
+{
+    nvs_handle_t nvs;
+    esp_err_t ret = nvs_open(HODOR_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (ret != ESP_OK) return ret;
+    ret = nvs_set_str(nvs, HODOR_NVS_MQTT_URI, uri ? uri : "");
+    if (ret == ESP_OK) ret = nvs_commit(nvs);
+    nvs_close(nvs);
+    return ret;
+}
+
+/* =========================================================================
+ * Befehlsverarbeitung
+ * ========================================================================= */
 static void parse_and_dispatch(const char *data, int len)
 {
-    /* Minimaler JSON-Parser: sucht nach "cmd":"open" etc. */
     char buf[64];
     int  copy_len = (len < 63) ? len : 63;
     memcpy(buf, data, copy_len);
@@ -42,7 +68,7 @@ static void parse_and_dispatch(const char *data, int len)
 
     sm_event_t evt = { .id = EVT_NONE, .data = 0 };
 
-    if (strstr(buf, "\"open\""))    evt.id = EVT_CMD_OPEN;
+    if      (strstr(buf, "\"open\""))   evt.id = EVT_CMD_OPEN;
     else if (strstr(buf, "\"close\""))  evt.id = EVT_CMD_CLOSE;
     else if (strstr(buf, "\"stop\""))   evt.id = EVT_CMD_STOP;
     else if (strstr(buf, "\"toggle\"")) evt.id = EVT_CMD_TOGGLE;
@@ -56,6 +82,9 @@ static void parse_and_dispatch(const char *data, int len)
     }
 }
 
+/* =========================================================================
+ * Event-Handler
+ * ========================================================================= */
 static void mqtt_event_handler(void *arg, esp_event_base_t base,
                                 int32_t id, void *data)
 {
@@ -63,7 +92,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
     switch (id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT verbunden");
-            esp_mqtt_client_subscribe(s_client, MQTT_TOPIC_CMD, 1);
+            esp_mqtt_client_subscribe(s_client, HODOR_MQTT_TOPIC_CMD, 1);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGW(TAG, "MQTT getrennt");
@@ -77,6 +106,9 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
     }
 }
 
+/* =========================================================================
+ * Init / Task
+ * ========================================================================= */
 esp_err_t comm_mqtt_init(void)
 {
     ESP_LOGI(TAG, "MQTT-Task initialisiert");
@@ -87,14 +119,31 @@ void comm_mqtt_task_func(void *arg)
 {
     (void)arg;
 
-    /* Auf WiFi-Verbindung warten */
+    /* Prüfen ob MQTT aktiviert ist */
+    param_value_t mqtt_en = {0};
+    param_get(PARAM_MQTT_EN, &mqtt_en);
+    if (!mqtt_en.b) {
+        ESP_LOGI(TAG, "MQTT deaktiviert (mqtt_en=false) – Task beendet");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    /* Broker-URI aus NVS laden */
+    char uri[MQTT_URI_MAX_LEN] = {0};
+    if (!load_mqtt_uri(uri, sizeof(uri))) {
+        ESP_LOGW(TAG, "Keine MQTT-Broker-URI gespeichert – Task beendet");
+        vTaskDelete(NULL);
+        return;
+    }
+    ESP_LOGI(TAG, "MQTT-Broker: %s", uri);
+
+    /* Auf WiFi-Verbindung warten (kein MQTT im AP-Modus) */
     EventGroupHandle_t eg = comm_get_event_group();
     xEventGroupWaitBits(eg, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    /* MQTT-Client konfigurieren */
-    /* TODO: Broker-URL aus NVS laden */
+    /* MQTT-Client konfigurieren und starten */
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "mqtt://192.168.1.1",  /* Platzhalter */
+        .broker.address.uri = uri,
     };
     s_client = esp_mqtt_client_init(&mqtt_cfg);
     if (!s_client) {
@@ -118,7 +167,7 @@ void comm_mqtt_task_func(void *arg)
                      (int)st.sys_state, (int)st.door_state,
                      st.position_mm, st.current_a);
             if (s_client) {
-                esp_mqtt_client_publish(s_client, MQTT_TOPIC_STATUS,
+                esp_mqtt_client_publish(s_client, HODOR_MQTT_TOPIC_STATUS,
                                         json, 0, 0, 0);
             }
         }

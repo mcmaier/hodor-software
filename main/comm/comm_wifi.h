@@ -31,6 +31,18 @@ void comm_wifi_task_func(void *arg);
  */
 EventGroupHandle_t comm_get_event_group(void);
 
+/**
+ * @brief WiFi-Credentials in NVS speichern.
+ *        Wird vom HTTP-Captive-Portal aufgerufen.
+ *        Nach Speichern ist ein esp_restart() erforderlich.
+ * @param ssid  SSID (max. 32 Zeichen)
+ * @param pass  Passwort (max. 64 Zeichen, NULL für offenes Netzwerk)
+ */
+esp_err_t comm_wifi_save_credentials(const char *ssid, const char *pass);
+
+/** @brief true wenn WiFi im AP-Modus läuft (Erstinbetriebnahme / Fallback). */
+bool comm_wifi_is_ap_mode(void);
+
 #ifdef __cplusplus
 }
 #endif
