@@ -90,9 +90,10 @@ extern "C" {
 #define HODOR_LEDC_TIMER       0   /* LEDC_TIMER_0    */
 #define HODOR_LEDC_CH_PWM_1    0   /* LEDC_CHANNEL_0  */
 #define HODOR_LEDC_CH_PWM_2    1   /* LEDC_CHANNEL_1  */
-/** 12-Bit-Auflösung → 4096 Stufen bei 20 kHz auf 240-MHz-APB möglich */
-#define HODOR_LEDC_RESOLUTION  12  /* LEDC_TIMER_12_BIT */
-#define HODOR_LEDC_DUTY_MAX           ((1u << 12) - 1u)   /* 4095 */
+/** 11-Bit-Auflösung → 2048 Stufen; APB 80 MHz / (20 kHz × 2048) = 1,95 → OK
+ *  (ESP32-S3 bei 160 MHz CPU: APB = 80 MHz; 12 Bit wäre Divider < 1) */
+#define HODOR_LEDC_RESOLUTION  11  /* LEDC_TIMER_11_BIT */
+#define HODOR_LEDC_DUTY_MAX           ((1u << 11) - 1u)   /* 2047 */
 
 /* =========================================================================
  * GPIO-Pinbelegung
